@@ -1,0 +1,778 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>arcline SSO & RBAC Bridge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: sticky table of contents on the left, one readable column of sections on the right; stacks on phones. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface-2: #eaeff5;
+  --fg: #15202c;
+  --muted: #536171;
+  --line: #c8d2dd;
+  --accent: #1c5ea6;
+  --accent-soft: #dce8f6;
+  --ok: #1d7549;
+  --ok-soft: #dbf0e3;
+  --warn: #8f5b00;
+  --warn-soft: #f9ecd2;
+  --bad: #b02a1d;
+  --bad-soft: #f9e1de;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d131a; --surface: #141c25; --surface-2: #1b2531; --fg: #e2e8ee; --muted: #9aa7b5;
+    --line: #2d3a48; --accent: #6ea9ea; --accent-soft: #172f49; --ok: #5cc68e; --ok-soft: #13311f;
+    --warn: #e2b35e; --warn-soft: #362a12; --bad: #ef8d83; --bad-soft: #3b1a17; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d131a; --surface: #141c25; --surface-2: #1b2531; --fg: #e2e8ee; --muted: #9aa7b5;
+  --line: #2d3a48; --accent: #6ea9ea; --accent-soft: #172f49; --ok: #5cc68e; --ok-soft: #13311f;
+  --warn: #e2b35e; --warn-soft: #362a12; --bad: #ef8d83; --bad-soft: #3b1a17; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.shell { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding-block: 40px 80px; }
+@media (max-width: 960px) { .shell { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 24px 60px; } }
+
+/* Table of contents */
+nav.toc { position: sticky; top: calc(24px + env(safe-area-inset-top, 0px)); align-self: start; font-size: 14px; }
+nav.toc p { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+nav.toc a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--fg); background: var(--surface-2); outline: none; }
+nav.toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 960px) {
+  nav.toc { position: static; }
+  nav.toc ol { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav.toc a { border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; }
+}
+
+main { min-width: 0; max-width: 820px; }
+section { padding-block: 44px 8px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+section:first-of-type { border-top: 0; padding-top: 0; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(34px, 6vw, 54px); font-weight: 800; letter-spacing: -.02em; }
+h2 { font-size: clamp(26px, 3.6vw, 34px); font-weight: 800; letter-spacing: -.01em; margin-bottom: 14px; }
+h3 { font-size: 20px; font-weight: 600; margin: 28px 0 10px; }
+p { margin: 0 0 14px; max-width: 68ch; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; display: block; }
+.lede { font-size: 19px; color: var(--muted); max-width: 60ch; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+:not(pre) > code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+
+/* Hero */
+.hero { display: grid; gap: 18px; padding-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.one-liner { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 6px; }
+.one-liner b { font-family: var(--display); font-size: 18px; }
+
+/* Analogy table */
+.analogy { display: grid; gap: 10px; }
+.analogy-row { display: grid; grid-template-columns: 170px minmax(0,1fr) minmax(0,1.3fr); gap: 14px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.analogy-row .real { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.analogy-row .like { color: var(--accent); font-weight: 500; }
+.analogy-row .why { color: var(--muted); font-size: 15px; }
+.analogy-head { display: grid; grid-template-columns: 170px minmax(0,1fr) minmax(0,1.3fr); gap: 14px; padding: 0 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 640px) { .analogy-row, .analogy-head { grid-template-columns: minmax(0,1fr); gap: 4px; } .analogy-head { display: none; } }
+
+/* Architecture diagram */
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 8px 0 14px; }
+.diagram svg { display: block; width: 100%; min-width: 640px; height: auto; font-family: var(--body); }
+.n-box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+.n-app { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.n-plan { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.n-pill { fill: var(--surface); stroke: var(--accent); stroke-width: 1; }
+.t-title { fill: var(--fg); font-size: 14px; font-weight: 600; }
+.t-sub { fill: var(--muted); font-size: 11.5px; }
+.t-pill { fill: var(--fg); font-size: 12.5px; font-weight: 500; }
+.t-edge { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+.t-num { fill: var(--surface); font-size: 11px; font-weight: 600; font-family: var(--mono); }
+.c-num { fill: var(--accent); }
+.edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.edge.plan { stroke-dasharray: 5 5; }
+.arrowhead { fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 22px; height: 0; vertical-align: middle; margin-right: 6px; border-top: 2px solid var(--muted); }
+.legend span.dash::before { border-top-style: dashed; }
+
+/* Process steps (swim-lane style) */
+.process { display: grid; gap: 0; margin: 10px 0 16px; counter-reset: step; }
+.step { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 14px; position: relative; padding-bottom: 18px; }
+.step::before { counter-increment: step; content: counter(step); width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--surface); font-family: var(--mono); font-weight: 500; font-size: 14px; display: grid; place-items: center; position: relative; z-index: 1; }
+.step::after { content: ""; position: absolute; left: 16px; top: 34px; bottom: 0; width: 2px; background: var(--line); }
+.step:last-child::after { display: none; }
+.step .body { min-width: 0; padding-top: 4px; }
+.step .who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 13px; color: var(--muted); }
+.actor { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
+.actor.app { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.step .what { margin: 0; }
+.step .what + .what { margin-top: 6px; }
+.step.fail::before { background: var(--bad); }
+.step.branch { padding-left: 0; }
+.outcome { display: inline-flex; gap: 6px; align-items: center; font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; margin: 4px 6px 0 0; }
+.outcome.ok { background: var(--ok-soft); color: var(--ok); }
+.outcome.bad { background: var(--bad-soft); color: var(--bad); }
+.outcome.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* Why box and code ref */
+.why-box { border-left: 3px solid var(--accent); background: var(--surface); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 14px 0; }
+.why-box b { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; font-weight: 500; }
+.why-box p:last-child { margin-bottom: 0; }
+.where { font-size: 14px; color: var(--muted); }
+.where code { color: var(--fg); }
+
+/* Three walls */
+.walls { display: grid; gap: 10px; margin: 14px 0; }
+.wall { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.wall .tag { font-family: var(--display); font-weight: 800; font-size: 26px; color: var(--accent); line-height: 1; }
+.wall .tag small { display: block; font-family: var(--mono); font-size: 10px; font-weight: 400; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+.wall h4 { margin: 0 0 2px; font-size: 16px; font-weight: 600; }
+.wall p { margin: 0; font-size: 15px; color: var(--muted); }
+.wall.db { border-color: var(--accent); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 10px 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--surface-2); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Role cards */
+.roles { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin: 14px 0; }
+@media (max-width: 640px) { .roles { grid-template-columns: minmax(0,1fr); } }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.role .name { font-family: var(--mono); font-weight: 500; font-size: 15px; }
+.role .flags { display: flex; flex-wrap: wrap; gap: 6px; }
+.role p { margin: 0; font-size: 14.5px; color: var(--muted); }
+
+/* Glossary */
+.gloss-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 14px; }
+.gloss-tools input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); }
+.gloss-tools input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.filter { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.filter[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+dl.gloss { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin: 0; }
+@media (max-width: 720px) { dl.gloss { grid-template-columns: minmax(0,1fr); } }
+.term { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.term dt { font-weight: 600; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.term dt span { font-family: var(--mono); font-size: 10.5px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.term dd { margin: 4px 0 0; font-size: 14.5px; color: var(--muted); }
+.term dd em { color: var(--fg); font-style: normal; }
+.gloss-empty { color: var(--muted); font-style: italic; }
+
+/* Files */
+.files { display: grid; gap: 8px; margin: 12px 0; }
+.file { display: grid; grid-template-columns: minmax(0, 290px) minmax(0,1fr); gap: 14px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; align-items: baseline; }
+.file .fname { font-family: var(--mono); font-size: 13.5px; overflow-wrap: anywhere; }
+.file .fdesc { font-size: 14.5px; color: var(--muted); }
+.file.group { background: transparent; border: 0; padding: 14px 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+@media (max-width: 640px) { .file { grid-template-columns: minmax(0,1fr); gap: 2px; } }
+
+/* Commands */
+.cmd { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; overflow: hidden; }
+.cmd pre { margin: 0; padding: 10px 14px; overflow-x: auto; flex: 1; min-width: 0; font-family: var(--mono); font-size: 13.5px; }
+.cmd button { font: inherit; font-size: 12px; border: 0; border-left: 1px solid var(--line); background: var(--surface-2); color: var(--muted); padding: 0 14px; cursor: pointer; }
+.cmd button:hover, .cmd button:focus-visible { color: var(--accent); outline: none; }
+.cmd-label { font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+
+/* Status board */
+.board { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin: 14px 0; }
+@media (max-width: 720px) { .board { grid-template-columns: minmax(0,1fr); } }
+.col { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.col h3 { margin: 0 0 10px; font-size: 17px; display: flex; gap: 8px; align-items: center; }
+.col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.col li { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 8px; font-size: 14.5px; }
+.col li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; }
+.col.done li::before { background: var(--ok); }
+.col.todo li::before { background: var(--warn); }
+.col li small { display: block; color: var(--muted); font-size: 13px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+
+/* Roadmap */
+.roadmap { counter-reset: r; display: grid; gap: 10px; margin: 14px 0; padding: 0; list-style: none; }
+.roadmap li { counter-increment: r; display: grid; grid-template-columns: 40px minmax(0,1fr); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.roadmap li::before { content: counter(r, decimal-leading-zero); font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--accent); line-height: 1.1; }
+.roadmap b { display: block; }
+.roadmap span { color: var(--muted); font-size: 14.5px; }
+
+/* Quiz */
+details.q { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 10px 0; }
+details.q summary { cursor: pointer; padding: 14px 16px; font-weight: 500; list-style: none; display: grid; grid-template-columns: 26px minmax(0,1fr) auto; gap: 10px; align-items: baseline; }
+details.q summary::-webkit-details-marker { display: none; }
+details.q summary .qn { font-family: var(--mono); color: var(--accent); font-size: 13px; }
+details.q summary .reveal { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+details.q[open] summary .reveal { color: var(--accent); }
+details.q summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+details.q .a { padding: 0 16px 14px 52px; color: var(--muted); font-size: 15px; }
+details.q .a p:last-child { margin-bottom: 0; }
+
+.note { font-size: 14px; color: var(--muted); }
+footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <p>Contents</p>
+    <ol id="toc">
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#analogy">The office analogy</a></li>
+      <li><a href="#architecture">How the parts connect</a></li>
+      <li><a href="#login">1 · Logging in</a></li>
+      <li><a href="#rbac">2 · Role checks</a></li>
+      <li><a href="#tenant">3 · Data isolation</a></li>
+      <li><a href="#scim">4 · SCIM provisioning</a></li>
+      <li><a href="#audit">5 · Audit logging</a></li>
+      <li><a href="#dbroles">Database roles</a></li>
+      <li><a href="#codes">Status codes</a></li>
+      <li><a href="#files">Files</a></li>
+      <li><a href="#run">Run & test</a></li>
+      <li><a href="#status">Done vs not done</a></li>
+      <li><a href="#next">What to build next</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+      <li><a href="#quiz">Check yourself</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- OVERVIEW -->
+    <section id="overview" class="hero">
+      <span class="eyebrow">arcline · Enterprise SSO &amp; RBAC Bridge</span>
+      <h1>How your login and data-isolation service works</h1>
+      <p class="lede">A beginner's guide to every part of the project: what each piece does, how it does it, and why it is there. Written from the actual code in <code>D:\Agentic AI Projects\arcline-enterprise-auth</code>.</p>
+      <div class="chips" aria-label="Project status">
+        <span class="chip ok">37 / 37 tests pass</span>
+        <span class="chip ok">Tenant isolation verified on PostgreSQL</span>
+        <span class="chip ok">Audit log is insert-only</span>
+        <span class="chip warn">Local development only</span>
+        <span class="chip warn">Okta / Entra ID, SAML not done</span>
+      </div>
+      <div class="one-liner">
+        <b>The brief</b>
+        <span>Build an auth pipeline connecting the arcline AI stack to Okta / Azure AD via SAML or OIDC, with SCIM provisioning and row-level data scoping.</span>
+        <span class="note">Why it matters: large companies will not buy software unless their employees can sign in with the company account (single sign-on) and each customer's data is strictly kept apart from every other customer's.</span>
+      </div>
+      <div class="one-liner">
+        <b>In one sentence</b>
+        <span>A FastAPI web service (<code>main.py</code>) lets employees sign in through Keycloak, checks their roles, only shows them documents from their own organization (enforced twice in Python and once more inside PostgreSQL), lets an identity provider add users automatically through SCIM, and records every allow or deny in a log nobody in the app can edit.</span>
+      </div>
+    </section>
+
+    <!-- ANALOGY -->
+    <section id="analogy">
+      <span class="eyebrow">Big picture first</span>
+      <h2>Think of it as an office building</h2>
+      <p>Every security part of the project has a real-world twin. Keep this table in mind; the rest of the guide fills in the details.</p>
+      <div class="analogy-head"><span>Project part</span><span>Is like…</span><span>Why it exists</span></div>
+      <div class="analogy">
+        <div class="analogy-row"><span class="real">Keycloak</span><span class="like">The reception desk that checks your ID</span><span class="why">The app never handles passwords. One trusted desk checks who you are for every app.</span></div>
+        <div class="analogy-row"><span class="real">Okta / Entra ID</span><span class="like">Your employer's HR badge system</span><span class="why">Customers already manage staff there. Keycloak can later forward sign-in to them (planned).</span></div>
+        <div class="analogy-row"><span class="real">Session cookie</span><span class="like">The visitor badge you wear after reception</span><span class="why">You show it on every request instead of signing in again. It is signed, so it can't be forged.</span></div>
+        <div class="analogy-row"><span class="real">Roles (RBAC)</span><span class="like">Which floors your badge opens</span><span class="why">An <code>admin</code> badge opens <code>/admin</code>; an ordinary badge does not.</span></div>
+        <div class="analogy-row"><span class="real">Organizations (tenants)</span><span class="like">Different companies renting floors in the same building</span><span class="why">All customers share one database, so their rows must never mix.</span></div>
+        <div class="analogy-row"><span class="real">Row-level security</span><span class="like">Filing cabinets that only open for your company</span><span class="why">Even if the app code has a bug, PostgreSQL itself refuses to hand over another company's rows.</span></div>
+        <div class="analogy-row"><span class="real">SCIM</span><span class="like">HR sending a "new starter" form to building security</span><span class="why">Users get added automatically when the company hires them, instead of by hand.</span></div>
+        <div class="analogy-row"><span class="real">Audit log</span><span class="like">The security camera recording, in a locked room</span><span class="why">Shows who did what and when. The app can add footage but can't erase it.</span></div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section id="architecture">
+      <span class="eyebrow">Architecture</span>
+      <h2>How the parts connect</h2>
+      <p>Everything lives in one Python app (a <em>modular monolith</em>: one program, organized in clear sections) plus two Docker containers: Keycloak for login and PostgreSQL for data.</p>
+      <div class="diagram" role="img" aria-label="Architecture: the browser signs in at Keycloak, then calls the FastAPI app with a cookie. The app talks to PostgreSQL as arcline_app. An identity provider calls the SCIM endpoints. Okta or Entra ID and arcline ace or actor are planned.">
+        <svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <!-- Okta / Entra (planned) -->
+          <rect class="n-plan" x="20" y="20" width="180" height="60" rx="10"/>
+          <text class="t-title" x="110" y="45" text-anchor="middle">Okta / Entra ID</text>
+          <text class="t-sub" x="110" y="64" text-anchor="middle">company login · planned</text>
+          <!-- Keycloak -->
+          <rect class="n-box" x="250" y="20" width="250" height="60" rx="10"/>
+          <text class="t-title" x="375" y="45" text-anchor="middle">Keycloak  (Docker :8080)</text>
+          <text class="t-sub" x="375" y="64" text-anchor="middle">realm "arcline" · checks passwords</text>
+          <!-- Browser -->
+          <rect class="n-box" x="20" y="175" width="160" height="64" rx="10"/>
+          <text class="t-title" x="100" y="202" text-anchor="middle">Employee's browser</text>
+          <text class="t-sub" x="100" y="221" text-anchor="middle">holds the signed cookie</text>
+          <!-- SCIM client -->
+          <rect class="n-box" x="20" y="300" width="160" height="64" rx="10"/>
+          <text class="t-title" x="100" y="327" text-anchor="middle">SCIM client</text>
+          <text class="t-sub" x="100" y="346" text-anchor="middle">IdP adding users</text>
+          <!-- App -->
+          <rect class="n-app" x="250" y="125" width="250" height="255" rx="12"/>
+          <text class="t-title" x="375" y="150" text-anchor="middle">FastAPI app · main.py</text>
+          <rect class="n-pill" x="268" y="163" width="214" height="34" rx="8"/><text class="t-pill" x="375" y="185" text-anchor="middle">1 Login (OIDC)</text>
+          <rect class="n-pill" x="268" y="205" width="214" height="34" rx="8"/><text class="t-pill" x="375" y="227" text-anchor="middle">2 Role checks (RBAC)</text>
+          <rect class="n-pill" x="268" y="247" width="214" height="34" rx="8"/><text class="t-pill" x="375" y="269" text-anchor="middle">3 Tenant documents</text>
+          <rect class="n-pill" x="268" y="289" width="214" height="34" rx="8"/><text class="t-pill" x="375" y="311" text-anchor="middle">4 SCIM provisioning</text>
+          <rect class="n-pill" x="268" y="331" width="214" height="34" rx="8"/><text class="t-pill" x="375" y="353" text-anchor="middle">5 Audit logging</text>
+          <!-- Postgres -->
+          <rect class="n-box" x="580" y="125" width="220" height="255" rx="12"/>
+          <text class="t-title" x="690" y="150" text-anchor="middle">PostgreSQL 17</text>
+          <text class="t-sub" x="690" y="168" text-anchor="middle">Docker :5432 · db arcline_auth</text>
+          <text class="t-pill" x="600" y="200">organizations</text>
+          <text class="t-pill" x="600" y="224">organization_memberships</text>
+          <text class="t-pill" x="600" y="248">documents</text>
+          <text class="t-pill" x="600" y="272">audit_events</text>
+          <text class="t-pill" x="600" y="296">scim_configuration</text>
+          <text class="t-sub" x="600" y="330">RLS on: orgs, memberships,</text>
+          <text class="t-sub" x="600" y="346">documents</text>
+          <text class="t-sub" x="600" y="364">+ 5 SECURITY DEFINER functions</text>
+          <!-- AI stack (planned) -->
+          <rect class="n-plan" x="250" y="410" width="250" height="56" rx="10"/>
+          <text class="t-title" x="375" y="434" text-anchor="middle">arcline ace / arcline actor</text>
+          <text class="t-sub" x="375" y="452" text-anchor="middle">the AI stack · not connected yet</text>
+
+          <!-- Edges -->
+          <path class="edge plan" d="M200,50 L246,50" marker-end="url(#ah)"/>
+          <path class="edge" d="M120,175 L290,84" marker-end="url(#ah)"/>
+          <text class="t-edge" x="150" y="122">① sign in</text>
+          <path class="edge" d="M375,80 L375,121" marker-end="url(#ah)"/>
+          <text class="t-edge" x="382" y="106">② tokens</text>
+          <path class="edge" d="M180,207 L246,207" marker-end="url(#ah)"/>
+          <text class="t-edge" x="186" y="198">③ cookie</text>
+          <path class="edge" d="M180,332 L246,306" marker-end="url(#ah)"/>
+          <text class="t-edge" x="184" y="296">Bearer</text>
+          <path class="edge" d="M500,252 L576,252" marker-end="url(#ah)"/>
+          <text class="t-edge" x="503" y="243">SQL as</text>
+          <text class="t-edge" x="503" y="270">arcline_app</text>
+          <path class="edge plan" d="M375,410 L375,384" marker-end="url(#ah)"/>
+        </svg>
+      </div>
+      <div class="legend"><span>works today</span><span class="dash">planned, not built</span></div>
+    </section>
+
+    <!-- LOGIN -->
+    <section id="login">
+      <span class="eyebrow">Process 1 · OIDC single sign-on</span>
+      <h2>Logging in</h2>
+      <p><strong>What:</strong> An employee proves who they are to Keycloak, and the app gets a signed statement of their identity and roles. <strong>How:</strong> the OpenID Connect <em>authorization code flow with PKCE</em>, handled by the Authlib library.</p>
+      <div class="process">
+        <div class="step"><div class="body"><div class="who"><span class="actor">Browser</span> → <span class="actor app">App</span> <code>GET /auth/login</code></div><p class="what">The app creates a random <code>state</code> value and a secret PKCE <em>verifier</em>, stores them in the session, and redirects the browser to Keycloak with the client ID, the callback address and a <em>challenge</em> made from the verifier.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor">Browser</span> → <span class="actor">Keycloak</span></div><p class="what">You type your username and password into <strong>Keycloak's</strong> page. The app never sees them.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor">Keycloak</span> → <span class="actor">Browser</span> → <span class="actor app">App</span> <code>GET /auth/callback?code=…</code></div><p class="what">Keycloak sends you back with a short-lived one-time <code>code</code>. The app checks <code>state</code> matches, which blocks forged callbacks.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> → <span class="actor">Keycloak</span> server to server</div><p class="what">The app trades the code for tokens, sending its <code>client secret</code> and the PKCE verifier. A stolen code is useless without both.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor">Keycloak</span> → <span class="actor app">App</span></div><p class="what">Keycloak returns an <em>ID token</em> signed with its private key. Authlib checks the signature with Keycloak's public key, found through the <code>.well-known/openid-configuration</code> discovery address.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> → <span class="actor">Browser</span></div><p class="what">The app saves <code>sub</code> (your permanent user ID), email, username and <code>realm_access.roles</code> into a <strong>signed session cookie</strong>, and records a <code>login_succeeded</code> audit event.</p><span class="outcome ok">200 Login successful</span><span class="outcome bad">401 if anything fails · login_failed logged</span></div></div>
+        <div class="step"><div class="body"><div class="who">Every later request</div><p class="what">The browser sends the cookie automatically. <code>get_current_user</code> reads it; no cookie means <span class="outcome bad">401</span> and an <code>authentication_denied</code> event. <code>POST /auth/logout</code> clears it.</p></div></div>
+      </div>
+      <div class="why-box"><b>Why it's built this way</b><p>Passwords stay in one hardened place (Keycloak). Swapping Keycloak for a customer's Okta or Entra ID later only changes configuration, because they all speak the same OIDC standard. PKCE and <code>state</code> close the two classic attacks on this flow: stolen codes and forged callbacks.</p></div>
+      <p class="where">In the code: OAuth setup <code>main.py:651</code> · <code>/auth/login</code> <code>:699</code> · <code>/auth/callback</code> <code>:706</code> · <code>get_current_user</code> <code>:754</code> · logout <code>:913</code> · cookie middleware <code>:56</code>. Keycloak client: <code>arcline-auth-api</code>, redirect <code>http://localhost:8000/auth/callback</code>.</p>
+    </section>
+
+    <!-- RBAC -->
+    <section id="rbac">
+      <span class="eyebrow">Process 2 · Role-based access control</span>
+      <h2>Role checks</h2>
+      <p><strong>What:</strong> some pages are only for certain roles. <strong>How:</strong> a FastAPI <em>dependency</em> named <code>require_role("admin")</code> runs before the <code>/admin</code> endpoint and looks for <code>admin</code> in the roles saved at login.</p>
+      <div class="process">
+        <div class="step"><div class="body"><div class="who"><span class="actor">Browser</span> → <span class="actor app">App</span> <code>GET /admin</code></div><p class="what">First <code>get_current_user</code>: is there a session at all?</p><span class="outcome bad">no → 401</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">require_role("admin")</span></div><p class="what">Is <code>"admin"</code> in the user's roles list?</p><span class="outcome bad">no → 403 · role_authorization_denied logged</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">/admin</span></div><p class="what">The endpoint runs and returns the admin dashboard.</p><span class="outcome ok">200</span></div></div>
+      </div>
+      <div class="why-box"><b>Why a dependency</b><p>The rule is written once and attached to any endpoint with one line. It can't be forgotten halfway through a function, and every refusal is logged the same way.</p></div>
+      <p><strong>Two limits to know:</strong> roles are <em>global</em> Keycloak realm roles, the same in every organization (the <code>role</code> column in the membership table isn't used for this yet). And roles are copied into the cookie at login, so removing someone's admin role only takes effect after they log in again.</p>
+      <p class="where">In the code: <code>require_role</code> <code>main.py:769</code> · <code>/admin</code> <code>:927</code>.</p>
+    </section>
+
+    <!-- TENANT -->
+    <section id="tenant">
+      <span class="eyebrow">Process 3 · Row-level data scoping</span>
+      <h2>Data isolation between organizations</h2>
+      <p><strong>What:</strong> a member of organization A must never see organization B's documents, even though both live in the same tables. <strong>How:</strong> three independent walls. Any one of them alone would block the leak.</p>
+      <div class="walls">
+        <div class="wall"><div class="tag">1<small>app</small></div><div><h4>Membership check</h4><p>The app asks: is there a row in <code>organization_memberships</code> for this <code>sub</code> and this organization? If not: 403 and <code>tenant_access_denied</code>.</p></div></div>
+        <div class="wall"><div class="tag">2<small>app</small></div><div><h4>Double filter</h4><p>The document query filters by <strong>both</strong> document ID and organization ID, so guessing another company's document ID returns 404.</p></div></div>
+        <div class="wall db"><div class="tag">3<small>database</small></div><div><h4>PostgreSQL row-level security (RLS)</h4><p>Before querying, the app tells PostgreSQL who is asking. Policies in <code>schema.sql</code> hide every row that doesn't match, no matter what SQL the app sends.</p></div></div>
+      </div>
+      <h3>How wall 3 actually works</h3>
+      <div class="process">
+        <div class="step"><div class="body"><div class="who"><span class="actor app">set_postgres_security_context</span></div><p class="what">Runs <code>set_config('app.current_user_sub', sub, true)</code> and the same for <code>app.current_organization_id</code>. The <code>true</code> means "only for this transaction", so the value can't leak into someone else's request on a reused connection.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor">PostgreSQL policy</span> on <code>documents</code></div><p class="what">A row is visible only if its <code>organization_id</code> equals the current organization <strong>and</strong> a membership exists for the current user in that organization.</p></div></div>
+        <div class="step"><div class="body"><div class="who">If the app forgets step 1</div><p class="what">The setting is empty, <code>NULLIF</code> turns it into NULL, and NULL never equals anything. Result: <strong>zero rows</strong>. The system fails closed.</p></div></div>
+      </div>
+      <div class="why-box"><b>Why three walls</b><p>Code changes over time, and one forgotten <code>WHERE</code> clause is the most common way multi-tenant apps leak data. With RLS, the database is the last line of defense. It only works because the app connects as <code>arcline_app</code>, which is not allowed to bypass RLS, and because the tables use <code>FORCE ROW LEVEL SECURITY</code>, so even the table owner is filtered.</p></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Verified test (real PostgreSQL)</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Member reads own organization's document</td><td><span class="outcome ok">visible</span></td></tr>
+          <tr><td>Member reads another organization's document</td><td><span class="outcome ok">hidden</span></td></tr>
+          <tr><td>No security context set</td><td><span class="outcome ok">0 rows</span></td></tr>
+          <tr><td>Non-member names an organization</td><td><span class="outcome ok">0 rows</span></td></tr>
+          <tr><td><code>arcline_app</code> tries to insert a document</td><td><span class="outcome ok">refused</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="where">In the code: <code>set_postgres_security_context</code> <code>main.py:633</code> · documents endpoint <code>:840</code> · policies in <code>schema.sql</code> · tests in <code>test_postgres_rls.py</code>.</p>
+    </section>
+
+    <!-- SCIM -->
+    <section id="scim">
+      <span class="eyebrow">Process 4 · SCIM 2.0 provisioning</span>
+      <h2>Adding users automatically</h2>
+      <p><strong>What:</strong> when a company hires someone, their identity provider calls our SCIM endpoints to give that person access. <strong>How:</strong> a bearer-token-protected API that checks the user really exists in Keycloak, then links them to the configured organization as a <code>member</code>.</p>
+      <div class="process">
+        <div class="step"><div class="body"><div class="who"><span class="actor">SCIM client</span> → <span class="actor app">App</span> <code>POST /scim/v2/Users</code></div><p class="what">Header <code>Authorization: Bearer &lt;SCIM_BEARER_TOKEN&gt;</code>. Compared with <code>secrets.compare_digest</code>, which takes the same time whether the guess is close or not, so attackers learn nothing from timing.</p><span class="outcome bad">wrong token → 401</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> validates the body</div><p class="what">Must include the SCIM User schema, and <code>userName</code> must equal <code>externalId</code>, both being the Keycloak user ID (<code>sub</code>).</p><span class="outcome bad">bad input → 400</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> → <span class="actor">Keycloak</span></div><p class="what">Using a second Keycloak client, <code>arcline-scim-verifier</code>, the app gets its own token (<em>client credentials</em> flow) and asks the Keycloak Admin API whether that user exists. That client is only allowed <code>view-users</code> and <code>query-users</code>.</p><span class="outcome bad">not found → 404</span><span class="outcome warn">Keycloak down → 503</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> → <span class="actor">PostgreSQL</span> <code>scim_provision_membership()</code></div><p class="what">A database function owned by <code>arcline_scim_writer</code> checks the organization is the one allowed in <code>scim_configuration</code> (<code>arcline-default</code>), then inserts the membership with role <code>member</code>.</p><span class="outcome bad">already there → 409</span><span class="outcome ok">created → 201</span></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span></div><p class="what">Records <code>scim_user_provisioned</code> or <code>scim_user_provisioning_denied</code> with the reason.</p></div></div>
+      </div>
+      <div class="why-box"><b>Why these choices</b><p><strong>Role is always <code>member</code>:</strong> if the caller could choose the role, anyone holding the SCIM token could create admins. <strong>Keycloak check first:</strong> stops memberships for people who don't exist. <strong>Organization stored in the database:</strong> the caller can't point SCIM at another tenant.</p></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Endpoint</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /scim/v2/ServiceProviderConfig</code></td><td>Tells the identity provider which SCIM features exist (PATCH, bulk, filter, sort are all "not supported")</td></tr>
+          <tr><td><code>GET /scim/v2/Users</code></td><td>Lists users in the configured organization, paged with <code>startIndex</code> and <code>count</code> (max 100)</td></tr>
+          <tr><td><code>GET /scim/v2/Users/{id}</code></td><td>One user, or 404</td></tr>
+          <tr><td><code>POST /scim/v2/Users</code></td><td>Provisions the user, as above</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Current limits:</strong> no <code>PATCH</code> or <code>DELETE</code>, so a person who leaves the company is never removed (deprovisioning is the main reason enterprises want SCIM). Real Okta sends an email as <code>userName</code>, not a Keycloak ID, so it won't work with Okta as-is.</p>
+      <p class="where">In the code: token check <code>main.py:225</code> · config <code>:247</code> · Keycloak verify <code>:325</code> · list/get <code>:476</code>/<code>:495</code> · provision <code>:508</code> · SQL in <code>scim_provisioning_migration.sql</code>.</p>
+    </section>
+
+    <!-- AUDIT -->
+    <section id="audit">
+      <span class="eyebrow">Process 5 · Audit logging</span>
+      <h2>Recording who did what</h2>
+      <p><strong>What:</strong> every login, logout, refusal, document read and SCIM action becomes a row in <code>audit_events</code>. <strong>How:</strong> the helper <code>_record_audit_event</code> filters the data, then calls a locked-down database function.</p>
+      <div class="process">
+        <div class="step"><div class="body"><div class="who"><span class="actor app">_record_audit_event</span></div><p class="what">Rejects unknown event types and outcomes (<code>success</code>, <code>failure</code>, <code>denied</code>). Drops any metadata key except <code>reason</code>, <code>required_role</code>, <code>resource</code>, <code>status_code</code>, and cuts text to 120 characters. Tokens and personal data can't sneak in.</p></div></div>
+        <div class="step"><div class="body"><div class="who"><span class="actor app">App</span> → <span class="actor">PostgreSQL</span> <code>record_audit_event()</code></div><p class="what">The function runs with its owner's rights (<code>arcline_audit_writer</code>, which can only INSERT). It re-checks the same rules, then inserts the row with a timestamp.</p></div></div>
+        <div class="step"><div class="body"><div class="who">If writing fails</div><p class="what">The app rolls back, logs a short warning without details, and the user's request still succeeds.</p></div></div>
+      </div>
+      <div class="why-box"><b>Why the app can't edit the log</b><p><code>arcline_app</code> has <strong>no</strong> privileges on <code>audit_events</code> (verified): it can't read, update or delete rows. It can only call the insert function. If an attacker took over the app, they still couldn't erase their tracks.</p></div>
+      <p><strong>A trade-off to know:</strong> the "request still succeeds if the log write fails" rule favors keeping the app available over a complete audit trail. Some compliance standards require the opposite.</p>
+      <p class="where">Event types: <code>login_succeeded</code>, <code>login_failed</code>, <code>logout_succeeded</code>, <code>authentication_denied</code>, <code>role_authorization_denied</code>, <code>tenant_access_denied</code>, <code>document_access_succeeded</code>, <code>document_access_denied</code>, <code>scim_user_provisioned</code>, <code>scim_user_provisioning_denied</code>. Code: <code>main.py:152</code>.</p>
+    </section>
+
+    <!-- DB ROLES -->
+    <section id="dbroles">
+      <span class="eyebrow">Least privilege</span>
+      <h2>The four database roles</h2>
+      <p>A PostgreSQL <em>role</em> is a database user. Each one gets only the permissions its job needs. Two of them can't even log in; they only <em>own</em> functions so those functions run with exactly their limited rights.</p>
+      <div class="roles">
+        <div class="role"><span class="name">arcline_admin</span><div class="flags"><span class="chip">can log in</span><span class="chip bad">bypasses RLS</span></div><p>Runs migrations and creates test data. Never the app's role. If the app used it, wall 3 would silently switch off.</p></div>
+        <div class="role"><span class="name">arcline_app</span><div class="flags"><span class="chip">can log in</span><span class="chip ok">RLS applies</span></div><p>What <code>DATABASE_URL</code> connects as (verified). SELECT on organizations, memberships, documents. EXECUTE on the audit and SCIM functions. Nothing on <code>audit_events</code>.</p></div>
+        <div class="role"><span class="name">arcline_audit_writer</span><div class="flags"><span class="chip">no login</span><span class="chip ok">INSERT only</span></div><p>Owns <code>record_audit_event()</code>. The only path into the audit table.</p></div>
+        <div class="role"><span class="name">arcline_scim_writer</span><div class="flags"><span class="chip">no login</span><span class="chip ok">one org only</span></div><p>Owns the four <code>scim_*()</code> functions. SELECT and INSERT on memberships, limited by its own RLS policies to the SCIM organization.</p></div>
+      </div>
+      <div class="why-box"><b>The SECURITY DEFINER pattern</b><p>Normally a function runs with the caller's rights. <code>SECURITY DEFINER</code> makes it run with the <em>owner's</em> rights instead. So the app gets a narrow door ("insert one valid audit row") without a key to the whole room. Each function also pins <code>search_path</code> so nobody can trick it into calling a fake table.</p></div>
+    </section>
+
+    <!-- STATUS CODES -->
+    <section id="codes">
+      <span class="eyebrow">Reference</span>
+      <h2>HTTP status codes you'll see</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Code</th><th>Means</th><th>Where in this project</th></tr></thead>
+        <tbody>
+          <tr><td class="num">200</td><td>OK</td><td>Any successful read</td></tr>
+          <tr><td class="num">201</td><td>Created</td><td>SCIM user provisioned</td></tr>
+          <tr><td class="num">400</td><td>Bad request</td><td>SCIM body malformed, or <code>userName</code> ≠ <code>externalId</code></td></tr>
+          <tr><td class="num">401</td><td>Not signed in / bad credentials</td><td>No session cookie, failed login, wrong SCIM token</td></tr>
+          <tr><td class="num">403</td><td>Signed in but not allowed</td><td>Missing <code>admin</code> role, not a member of the organization</td></tr>
+          <tr><td class="num">404</td><td>Not found</td><td>Document not in your organization, unknown Keycloak user</td></tr>
+          <tr><td class="num">409</td><td>Conflict</td><td>SCIM user already provisioned</td></tr>
+          <tr><td class="num">422</td><td>Validation error</td><td><code>POST /message</code> without a <code>message</code> field</td></tr>
+          <tr><td class="num">500</td><td>Server error</td><td>Membership insert failed in the database</td></tr>
+          <tr><td class="num">503</td><td>Service unavailable</td><td>Keycloak unreachable during SCIM, or SCIM organization not configured</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Rule of thumb: <strong>401</strong> means "who are you?", <strong>403</strong> means "I know who you are, and the answer is no."</p>
+    </section>
+
+    <!-- FILES -->
+    <section id="files">
+      <span class="eyebrow">Project map</span>
+      <h2>What each file is for</h2>
+      <div class="files">
+        <div class="file group">The app</div>
+        <div class="file"><span class="fname">main.py</span><span class="fdesc">Everything: settings, database models, OIDC login, role checks, tenant documents, SCIM, audit. Sections are numbered in comments.</span></div>
+        <div class="file"><span class="fname">.env</span><span class="fdesc">Secrets and settings (client secrets, database URLs, SCIM token). Never share or commit it.</span></div>
+        <div class="file"><span class="fname">requirements.txt</span><span class="fdesc">Exact Python package versions to install.</span></div>
+        <div class="file group">Database migrations · run in this order as arcline_admin</div>
+        <div class="file"><span class="fname">1 · schema.sql</span><span class="fdesc">Creates the tables, <code>arcline_app</code>, and the RLS policies.</span></div>
+        <div class="file"><span class="fname">2 · audit_stage3_migration_least_privilege.sql</span><span class="fdesc">Creates <code>audit_events</code>, <code>arcline_audit_writer</code>, and the insert-only function.</span></div>
+        <div class="file"><span class="fname">3 · scim_provisioning_migration.sql</span><span class="fdesc">Adds SCIM audit event types, <code>arcline_scim_writer</code>, <code>scim_configuration</code>, and the four SCIM functions.</span></div>
+        <div class="file group">Tests</div>
+        <div class="file"><span class="fname">test_auth.py</span><span class="fdesc">16 tests: login, sessions, roles, tenant documents, basic endpoints (SQLite).</span></div>
+        <div class="file"><span class="fname">test_scim_mvp.py</span><span class="fdesc">10 tests: SCIM success, duplicate, unknown user, bad input, bad token, Keycloak down (SQLite, Keycloak mocked).</span></div>
+        <div class="file"><span class="fname">test_audit_stage3.py</span><span class="fdesc">3 tests: metadata filtering, unauthenticated requests are logged, log failures stay hidden (SQLite).</span></div>
+        <div class="file"><span class="fname">test_postgres_rls.py</span><span class="fdesc">5 tests: real two-organization isolation as <code>arcline_app</code> (PostgreSQL).</span></div>
+        <div class="file"><span class="fname">test_audit_postgres_events.py · _integration.py</span><span class="fdesc">3 tests: audit rows really land in PostgreSQL.</span></div>
+        <div class="file group">Helpers and history</div>
+        <div class="file"><span class="fname">check_db_connections.py</span><span class="fdesc">Tries each test database URL and prints which user it connected as.</span></div>
+        <div class="file"><span class="fname">README.md</span><span class="fdesc">Short version of this guide.</span></div>
+        <div class="file"><span class="fname">_archive/</span><span class="fdesc">Older versions of <code>main.py</code>, SQL and notes. Not used; safe to delete once you use git.</span></div>
+      </div>
+      <p class="note">Why most tests use SQLite: it needs no server, so tests run in about 5 seconds. The catch: SQLite has no RLS or database roles, so only the PostgreSQL tests prove isolation. <code>main.py</code> has a separate code path for each database for this reason.</p>
+    </section>
+
+    <!-- RUN -->
+    <section id="run">
+      <span class="eyebrow">Hands on</span>
+      <h2>Run and test it</h2>
+      <p>Start Docker Desktop first; it runs the <code>arcline-keycloak</code> and <code>arcline-postgres</code> containers. Then, in the VS Code terminal inside the project folder:</p>
+      <p class="cmd-label">Activate the Python virtual environment</p>
+      <div class="cmd"><pre>.\.venv\Scripts\Activate.ps1</pre><button type="button" data-copy>Copy</button></div>
+      <p class="cmd-label">Install packages (first time, or after changes)</p>
+      <div class="cmd"><pre>pip install -r requirements.txt</pre><button type="button" data-copy>Copy</button></div>
+      <p class="cmd-label">Start the app, then open http://localhost:8000/auth/login</p>
+      <div class="cmd"><pre>uvicorn main:app --reload</pre><button type="button" data-copy>Copy</button></div>
+      <p class="cmd-label">Quick tests (no Docker needed, about 5 s)</p>
+      <div class="cmd"><pre>python -m pytest -q test_auth.py test_scim_mvp.py test_audit_stage3.py</pre><button type="button" data-copy>Copy</button></div>
+      <p class="cmd-label">All 37 tests (Docker running)</p>
+      <div class="cmd"><pre>python -m pytest -q</pre><button type="button" data-copy>Copy</button></div>
+      <p class="cmd-label">Check database connections</p>
+      <div class="cmd"><pre>python check_db_connections.py</pre><button type="button" data-copy>Copy</button></div>
+      <p class="note">FastAPI also gives you a clickable API page at <code>http://localhost:8000/docs</code> while the app is running.</p>
+    </section>
+
+    <!-- STATUS -->
+    <section id="status">
+      <span class="eyebrow">Honest status · 29 Oct 2026</span>
+      <h2>Done vs not done</h2>
+      <div class="board">
+        <div class="col done"><h3><span class="dot ok"></span>Built and verified locally</h3><ul>
+          <li><span>Keycloak OIDC login, sessions, logout<small>authorization code + PKCE</small></span></li>
+          <li><span>Admin role check on <code>/admin</code><small>200 admin · 403 employee · 401 anonymous</small></span></li>
+          <li><span>Tenant isolation, three walls<small>5 PostgreSQL tests pass as arcline_app</small></span></li>
+          <li><span>SCIM add-user flow<small>201 · 409 · 404 · 400 · 401 · 503 covered</small></span></li>
+          <li><span>Insert-only audit log<small>arcline_app has no table privileges</small></span></li>
+          <li><span>Project cleaned and documented<small>37 / 37 tests pass</small></span></li>
+        </ul></div>
+        <div class="col todo"><h3><span class="dot warn"></span>Not built yet</h3><ul>
+          <li><span>Okta / Entra ID connection<small>Keycloak identity brokering can do this</small></span></li>
+          <li><span>SAML login<small>part of the original brief</small></span></li>
+          <li><span>SCIM removal of leavers<small>needs PATCH active=false and DELETE</small></span></li>
+          <li><span>SCIM with real Okta payloads<small>Okta sends email as userName</small></span></li>
+          <li><span>Per-organization roles<small>roles are global today</small></span></li>
+          <li><span>Connect arcline ace / actor<small>the "AI stack" half of the brief</small></span></li>
+          <li><span>Production hardening<small>HTTPS, secret storage, real Keycloak config, backups, monitoring, rate limits</small></span></li>
+          <li><span>Git version control<small>no history yet</small></span></li>
+        </ul></div>
+      </div>
+      <h3>Small code issues spotted</h3>
+      <ul>
+        <li><code>require_organization_member</code> (<code>main.py:789</code>) is never used; the same check is copied into the documents endpoint.</li>
+        <li>Roles stay in the cookie until the next login.</li>
+        <li>A redundant <code>import json</code> inside <code>_record_audit_event</code>.</li>
+      </ul>
+    </section>
+
+    <!-- NEXT -->
+    <section id="next">
+      <span class="eyebrow">Roadmap</span>
+      <h2>What to build next, in order</h2>
+      <ol class="roadmap">
+        <li><div><b>Put the project in git</b><span>One command, <code>git init</code>, then a first commit. Replaces backup copies like <code>main_v2.py</code> with real history.</span></div></li>
+        <li><div><b>SCIM deprovisioning</b><span>Add <code>PATCH</code> (set <code>active=false</code>) and <code>DELETE</code> so leavers lose access. The most important enterprise gap.</span></div></li>
+        <li><div><b>Connect Okta or Entra ID</b><span>Add them as an identity provider inside Keycloak (brokering). The app's code barely changes.</span></div></li>
+        <li><div><b>Per-organization roles</b><span>Use the membership <code>role</code> column so someone can be admin in one company and member in another.</span></div></li>
+        <li><div><b>Connect arcline ace and actor</b><span>Make the AI apps ask this service who the user is and which organization's data they may use.</span></div></li>
+        <li><div><b>SAML, then production hardening</b><span>SAML for customers who require it. Then HTTPS, a secrets manager, a production Keycloak setup and monitoring.</span></div></li>
+      </ol>
+    </section>
+
+    <!-- GLOSSARY -->
+    <section id="glossary">
+      <span class="eyebrow">Every term, in plain words</span>
+      <h2>Glossary</h2>
+      <div class="gloss-tools">
+        <label for="gloss-search" class="note" style="flex-basis:100%;margin:0">Search or filter by topic</label>
+        <input id="gloss-search" type="search" placeholder="Try “token” or “RLS”" autocomplete="off">
+        <button class="filter" type="button" data-cat="all" aria-pressed="true">All</button>
+        <button class="filter" type="button" data-cat="identity" aria-pressed="false">Identity</button>
+        <button class="filter" type="button" data-cat="access" aria-pressed="false">Access</button>
+        <button class="filter" type="button" data-cat="database" aria-pressed="false">Database</button>
+        <button class="filter" type="button" data-cat="scim" aria-pressed="false">SCIM</button>
+        <button class="filter" type="button" data-cat="tools" aria-pressed="false">Tools</button>
+      </div>
+      <dl class="gloss" id="gloss"></dl>
+      <p class="gloss-empty" id="gloss-empty" hidden>No terms match. Try a shorter word.</p>
+    </section>
+
+    <!-- QUIZ -->
+    <section id="quiz">
+      <span class="eyebrow">Understanding check</span>
+      <h2>Check yourself</h2>
+      <p>Answer in your head first, then open the answer.</p>
+      <details class="q"><summary><span class="qn">Q1</span><span>If <code>DATABASE_URL</code> connected as <code>arcline_admin</code>, which isolation wall would stop working, and why wouldn't the tests catch it?</span><span class="reveal">answer</span></summary><div class="a"><p>Wall 3, RLS, because <code>arcline_admin</code> bypasses it. Walls 1 and 2 in Python would still block the leak, so every app test would still pass. The weakness only shows up if a future code change breaks walls 1 or 2.</p></div></details>
+      <details class="q"><summary><span class="qn">Q2</span><span>Why does SCIM always assign <code>member</code> and ignore any role in the request?</span><span class="reveal">answer</span></summary><div class="a"><p>Otherwise anyone holding the SCIM token could create admins. The server decides privileges; the caller doesn't.</p></div></details>
+      <details class="q"><summary><span class="qn">Q3</span><span>An admin loses the <code>admin</code> role in Keycloak while still logged in. Can they still open <code>/admin</code>?</span><span class="reveal">answer</span></summary><div class="a"><p>Yes, until they log out. Roles were copied into the session cookie at login and aren't re-checked with Keycloak on each request.</p></div></details>
+      <details class="q"><summary><span class="qn">Q4</span><span>What happens if the code forgets to call <code>set_postgres_security_context</code> before reading documents?</span><span class="reveal">answer</span></summary><div class="a"><p>Zero rows come back. The empty setting becomes NULL, and comparisons with NULL never match. This is "failing closed": a bug hides data instead of exposing it.</p></div></details>
+      <details class="q"><summary><span class="qn">Q5</span><span>Why does the app never see the user's password?</span><span class="reveal">answer</span></summary><div class="a"><p>With OIDC, the user types the password on Keycloak's page. The app only receives a one-time code, which it exchanges for a signed ID token.</p></div></details>
+      <details class="q"><summary><span class="qn">Q6</span><span>What's the difference between a 401 and a 403?</span><span class="reveal">answer</span></summary><div class="a"><p>401: we don't know who you are (no or bad credentials). 403: we know who you are, and you're not allowed.</p></div></details>
+      <details class="q"><summary><span class="qn">Q7</span><span>How can the app write audit rows if it has no INSERT permission on <code>audit_events</code>?</span><span class="reveal">answer</span></summary><div class="a"><p>It calls <code>record_audit_event()</code>, a <code>SECURITY DEFINER</code> function that runs with its owner's rights (<code>arcline_audit_writer</code>, INSERT only). The app gets one narrow door instead of table access.</p></div></details>
+    </section>
+
+    <footer>Built from the project source on 29 Oct 2026. Line numbers refer to <code>main.py</code> as of that date and will shift as the file changes.</footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  const TERMS = [
+    ["Authentication (AuthN)", "access", "Proving <em>who</em> you are. Here: logging in through Keycloak."],
+    ["Authorization (AuthZ)", "access", "Deciding <em>what</em> you may do once we know who you are. Here: role checks and organization membership."],
+    ["SSO (single sign-on)", "identity", "One company login gives access to many apps, so employees don't create a new password for each one."],
+    ["Identity provider (IdP)", "identity", "The service that holds user accounts and checks passwords. Keycloak here; Okta or Entra ID at customers."],
+    ["Keycloak", "identity", "Free, open-source identity provider. Runs in Docker as <em>arcline-keycloak</em> on port 8080. Stands in for Okta / Entra ID."],
+    ["Okta", "identity", "A popular commercial identity provider many enterprises use. Not connected yet."],
+    ["Entra ID (Azure AD)", "identity", "Microsoft's identity provider, formerly called Azure Active Directory. Not connected yet."],
+    ["Realm", "identity", "A separate space inside Keycloak with its own users, roles and clients. This project uses the realm <em>arcline</em>."],
+    ["Client (Keycloak)", "identity", "An app registered with Keycloak. <em>arcline-auth-api</em> is for user login; <em>arcline-scim-verifier</em> is for SCIM user lookups."],
+    ["Client secret", "identity", "A password for an app (not a person) that proves to Keycloak the request comes from our server. Kept in .env."],
+    ["OAuth 2.0", "identity", "The standard for letting an app get limited access tokens without handling the user's password."],
+    ["OIDC (OpenID Connect)", "identity", "A layer on top of OAuth 2.0 that adds login: it tells the app <em>who</em> the user is, through an ID token."],
+    ["SAML", "identity", "An older XML-based login standard, still required by some enterprises. In the brief, not built yet."],
+    ["Authorization code flow", "identity", "The OIDC login dance: browser goes to the IdP, comes back with a one-time code, server swaps the code for tokens."],
+    ["PKCE", "identity", "Proof Key for Code Exchange. The app sends a hashed secret at the start and the real secret at the end, so a stolen code is useless."],
+    ["State parameter", "identity", "A random value sent to the IdP and checked on return, so attackers can't inject their own login response."],
+    ["ID token", "identity", "A signed JSON Web Token from the IdP that states who the user is (sub, email, roles)."],
+    ["Access token", "identity", "A token that lets its holder call an API. The SCIM verifier uses one to ask Keycloak about users."],
+    ["JWT", "identity", "JSON Web Token: a compact, signed piece of JSON. Anyone can read it; only the issuer can create a valid signature."],
+    ["Claim", "identity", "One fact inside a token, like <em>email</em> or <em>sub</em>."],
+    ["sub (subject)", "identity", "The user's permanent unique ID from Keycloak, e.g. 6a070433-…. Used everywhere to identify a person, because emails can change."],
+    ["Discovery (.well-known)", "identity", "A standard URL where an IdP publishes its endpoints and public keys, so apps configure themselves automatically."],
+    ["Client credentials flow", "identity", "How an app logs in as <em>itself</em> (no user involved), using its client ID and secret. Used by the SCIM verifier."],
+    ["Federation / brokering", "identity", "Keycloak passing login on to another IdP like Okta. The planned way to support customer logins."],
+    ["Session", "access", "The app's memory of who you are between requests."],
+    ["Session cookie (signed)", "access", "A cookie holding your session data plus a signature made with SESSION_SECRET. Changing one character breaks the signature, so it can't be forged."],
+    ["RBAC", "access", "Role-based access control: permissions are attached to roles (like admin), and users get roles."],
+    ["Role", "access", "A named set of permissions. Realm roles live in Keycloak; the membership table also has a role column (member)."],
+    ["Dependency (FastAPI)", "access", "A function FastAPI runs before an endpoint, e.g. <em>get_current_user</em> or <em>require_role</em>. Reusable checks in one line."],
+    ["Least privilege", "access", "Give each user, app or role only the permissions it needs, nothing more. The idea behind the four database roles."],
+    ["Fail closed", "access", "When something goes wrong, deny access rather than allow it. RLS with a missing context returns zero rows."],
+    ["Bearer token", "access", "A secret sent as <em>Authorization: Bearer …</em>. Whoever holds it is trusted, so it must stay secret. Used for SCIM."],
+    ["Constant-time comparison", "access", "Comparing secrets in a way that always takes the same time (<em>secrets.compare_digest</em>), so timing reveals nothing."],
+    ["Audit log", "access", "A permanent record of security events: who, what, when, outcome. Table <em>audit_events</em>."],
+    ["Tenant", "database", "One customer organization sharing the system with others. Each has its own rows in the same tables."],
+    ["Multi-tenancy", "database", "Serving many customers from one app and one database while keeping their data apart."],
+    ["Row-level security (RLS)", "database", "A PostgreSQL feature: policies decide, row by row, what each query may see or change."],
+    ["Policy (RLS)", "database", "The rule for one table, e.g. 'show a document only if its organization matches the current one and the user is a member'."],
+    ["FORCE ROW LEVEL SECURITY", "database", "Makes RLS apply even to the table's owner. Without it, the owner skips the rules."],
+    ["BYPASSRLS / superuser", "database", "Role attributes that skip RLS entirely. arcline_admin has them; arcline_app must not."],
+    ["set_config(…, true)", "database", "Stores a value like app.current_user_sub for the current transaction only. RLS policies read it with current_setting."],
+    ["Transaction", "database", "A group of database statements that succeed or fail together. Ends with commit or rollback."],
+    ["SECURITY DEFINER function", "database", "A database function that runs with its owner's permissions, not the caller's. Gives the app narrow, controlled doors."],
+    ["search_path", "database", "Where PostgreSQL looks for tables by name. Pinned in each function so nobody can swap in a fake table."],
+    ["NOLOGIN role", "database", "A database role nobody can sign in as. Used only to own functions: arcline_audit_writer, arcline_scim_writer."],
+    ["Migration", "database", "A SQL script that changes the database structure. Run in order, by an admin role."],
+    ["JSONB", "database", "PostgreSQL's binary JSON column type. Used for audit metadata."],
+    ["SQLAlchemy / ORM", "database", "Python library for talking to databases. ORM (object-relational mapping) lets you use Python classes like <em>Document</em> instead of raw SQL."],
+    ["SQLite", "database", "A tiny file or in-memory database used for quick tests. Has no RLS or roles."],
+    ["SCIM 2.0", "scim", "System for Cross-domain Identity Management: a standard API identity providers use to create, update and remove users in other apps."],
+    ["Provisioning", "scim", "Creating access for a user automatically (here: inserting a membership)."],
+    ["Deprovisioning", "scim", "Removing access when someone leaves. Needs SCIM PATCH or DELETE. Not built yet."],
+    ["ServiceProviderConfig", "scim", "A SCIM endpoint that tells the IdP which features this server supports."],
+    ["userName / externalId", "scim", "SCIM user fields. This MVP requires both to equal the Keycloak sub; real Okta usually sends an email as userName."],
+    ["scim_configuration", "scim", "One-row table that names the only organization SCIM may write to (arcline-default)."],
+    ["FastAPI", "tools", "The Python web framework the app is built with. Gives automatic docs at /docs."],
+    ["Uvicorn", "tools", "The server program that runs the FastAPI app (uvicorn main:app)."],
+    ["Pydantic", "tools", "Validates incoming JSON against a Python class. Causes the 422 when POST /message lacks a message."],
+    ["Authlib", "tools", "Python library that handles the OIDC flow: redirects, PKCE, token exchange, signature checks."],
+    ["Docker / container", "tools", "Runs software (Keycloak, PostgreSQL) in isolated boxes, so you don't install it on Windows directly."],
+    ["start-dev", "tools", "Keycloak's development mode: easy, but insecure defaults. Never for production."],
+    [".env file", "tools", "Holds secrets and settings, loaded by python-dotenv. Listed in .gitignore so it is never committed."],
+    ["Virtual environment (.venv)", "tools", "A private folder of Python packages for this project only."],
+    ["pytest / TestClient", "tools", "pytest runs the tests; FastAPI's TestClient sends fake HTTP requests to the app without starting a server."],
+    ["Mock", "tools", "A fake stand-in during tests, e.g. pretending Keycloak answered, so tests run without it."],
+    ["Modular monolith", "tools", "One deployable program, organized into clear modules. Simpler than microservices for a project this size."]
+  ];
+
+  const list = document.getElementById("gloss");
+  const empty = document.getElementById("gloss-empty");
+  const search = document.getElementById("gloss-search");
+  const filters = document.querySelectorAll(".filter");
+  let cat = "all";
+
+  const frag = document.createDocumentFragment();
+  TERMS.forEach(([t, c, d]) => {
+    const wrap = document.createElement("div");
+    wrap.className = "term";
+    wrap.dataset.cat = c;
+    wrap.dataset.text = (t + " " + d.replace(/<[^>]+>/g, "")).toLowerCase();
+    wrap.innerHTML = `<dt>${t}<span>${c}</span></dt><dd>${d}</dd>`;
+    frag.appendChild(wrap);
+  });
+  list.appendChild(frag);
+
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    let shown = 0;
+    list.querySelectorAll(".term").forEach(el => {
+      const ok = (cat === "all" || el.dataset.cat === cat) && (!q || el.dataset.text.includes(q));
+      el.hidden = !ok;
+      if (ok) shown++;
+    });
+    empty.hidden = shown !== 0;
+  }
+  search.addEventListener("input", apply);
+  filters.forEach(b => b.addEventListener("click", () => {
+    cat = b.dataset.cat;
+    filters.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    apply();
+  }));
+
+  // Copy buttons
+  document.querySelectorAll("[data-copy]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pre = btn.parentElement.querySelector("pre");
+      const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1400); };
+      const fallback = () => {
+        const r = document.createRange(); r.selectNodeContents(pre);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent = "Press Ctrl+C";
+      };
+      try { navigator.clipboard.writeText(pre.textContent).then(done, fallback); } catch (e) { fallback(); }
+    });
+  });
+
+  // Highlight current section in the contents
+  const links = [...document.querySelectorAll("#toc a")];
+  const byId = new Map(links.map(a => [a.getAttribute("href").slice(1), a]));
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          links.forEach(a => a.classList.remove("active"));
+          const a = byId.get(e.target.id); if (a) a.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    document.querySelectorAll("main section[id]").forEach(s => io.observe(s));
+  }
+})();
+</script>
+
+</body></html>
